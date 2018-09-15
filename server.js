@@ -11,7 +11,7 @@ var mongoose = require('mongoose');
 var path = require('path');
 var morgan     = require("morgan");
 var User = require('./models/user');
-
+var bcrypt = require('bcrypt');
 var app = express();
 
 
@@ -71,7 +71,7 @@ app.use(flash());
 app.get('/home/:id',(req,res)=>{
     var user = String(req.params.id);
     console.log(user)
-        console.log("hello world")
+        console.log(user)
         res.render('home');
       
         
@@ -131,42 +131,41 @@ app.post('/register',  (req, res) => {
 );    
 
 
-passport.use(new LocalStrategy(
-	function (id, password, done) {
-		User.getUserById(id, function (err, user) {
-            console.log(id)
-			if (err) throw err;
-			if (!user) {
-				return done(null, false, { message: 'Unknown User' });
-			}
 
-			User.comparePassword(password, user.password, function (err, isMatch) {
-				if (err) throw err;
-				if (isMatch) {
-					return done(null, user);
-				} else {
-					return done(null, false, { message: 'Invalid password' });
-				}
-			});
-		});
-	}));
+app.post('/login',(req,res) =>{
+   
+    console.log(req.body.id)
 
-passport.serializeUser(function (user, done) {
-        done(null, user.id);
-    });
-    
-passport.deserializeUser(function (id, done) {
-        User.getUserById(id, function (err, user) {
-            done(err, user);
-        });
-    });
+    User.count({id:req.body.id}).exec(function(err,doc){
+        if (err) res.status(500).send(error);
 
-app.post('/login',
-	passport.authenticate('local', { successRedirect: '/home/:id', failureRedirect: '/login', failureFlash: true }),
-	function (req, res) {
-        console.log(req.body.id)
-		res.redirect('/home/'+ req.body.id);
-	});
+        
+        if(doc>0){
+            User.find({id:req.body.id}).exec(function(err,result){
+        
+                    bcrypt.compare(req.body.password,result[0].password,function(err, callback){
+                        if(callback){
+                            res.redirect('/home/'+req.body.id);
+                        }
+                        else{
+                            res.redirect('/login');
+                        }
+                    })
+                })
+           
+        }
+
+            else{
+                res.redirect('/login');
+                
+            }
+
+        }
+    )
+
+}
+	
+	);
 
     app.get('/logout', function (req, res) {
         req.logout();
