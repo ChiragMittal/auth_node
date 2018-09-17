@@ -68,19 +68,14 @@ app.use(passport.session());
 
 app.use(flash());
 
-app.get('/home/:id',(req,res)=>{
-    var user = String(req.params.id);
-    console.log(user)
-        console.log(user)
-        res.render('home');
-      
-        
-        
 
-});
 
 app.get('/register',function(req,res){
     res.render('register',{});
+});
+
+app.get('/reset_pwd',function(req,res){
+    res.render('reset',{});
 });
 
 app.get('/login',function(req,res){
@@ -134,7 +129,7 @@ app.post('/register',  (req, res) => {
 
 app.post('/login',(req,res) =>{
    
-    console.log(req.body.id)
+    // console.log(req.body.id)
 
     User.count({id:req.body.id}).exec(function(err,doc){
         if (err) res.status(500).send(error);
@@ -142,10 +137,15 @@ app.post('/login',(req,res) =>{
         
         if(doc>0){
             User.find({id:req.body.id}).exec(function(err,result){
-        
+                   
                     bcrypt.compare(req.body.password,result[0].password,function(err, callback){
+                      
+                   console.log(result[0])
+                   
                         if(callback){
-                            res.redirect('/home/'+req.body.id);
+                            req.session.cookie.maxAge = 1 * 24 * 60 * 60 * 1000;
+                            res.render('home',result[0]);
+                            //res.redirect('/home');
                         }
                         else{
                             res.redirect('/login');
@@ -167,13 +167,66 @@ app.post('/login',(req,res) =>{
 	
 	);
 
-    app.get('/logout', function (req, res) {
+app.get('/logout', function (req, res) {
         req.logout();
-    
+        req.session.cookie.expires = false;
         req.flash('success_msg', 'You are logged out');
     
         res.redirect('/login');
-    });
+});
+
+app.post('/reset_pwd',(req,res)=>{
+
+        User.count({id:req.body.id}).exec(function(err,doc){
+            if (err) res.status(500).send(error);
+
+            if(doc){
+                User.find({id:req.body.id}).exec(function(err,result){
+                   
+                    bcrypt.compare(req.body.password,result[0].password,function(err, callback){
+                      
+                  // console.log(result[0])
+                   
+                        if(callback){
+                            if(req.body.new_password==req.body.new_password2){
+                                bcrypt.genSalt(10, function(err, salt) {
+                                    bcrypt.hash(req.body.new_password, salt, function(err, hash) {
+                                        req.body.new_password = hash;
+                                        console.log(req.body.new_password)
+
+                                    User.update({id:req.body.id},{ $set: { password : req.body.new_password}  }, (err, items) => {
+                                        if (err) res.status(500).send(err)
+                                
+                                   
+                                            console.log(items);
+                                            res.redirect('/login')
+                                            
+                                    
+                                        })
+                                    });
+                                    
+                                });
+                                
+                            }
+                            else{
+                                res.redirect('/reset_pwd')
+                            }
+                            
+                            
+                        }
+                        else{
+                            res.redirect('/reset_pwd')
+                        }
+                    })
+                })
+         
+            }
+            else{
+                res.redirect('/reset_pwd')
+            }
+        })
+
+});
 
 
 
