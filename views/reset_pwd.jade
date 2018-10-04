@@ -1,0 +1,22 @@
+html
+  head
+    title= title
+    meta(name='viewport', content='width=device-width, initial-scale=1.0')
+    link(href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css', rel='stylesheet', media='screen')
+    script(src='http://code.jquery.com/jquery.js')
+    script(src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js')
+  body
+  h1 Forgot your password ?
+      br
+  form(role='form',method="post", style='max-width: 300px;')
+    .form-group
+      label(for='password') Username
+      input.form-control(type='text', name='id',  placeholder='Enter Username', required='required')
+    .form-group
+      label(for='password') New Password
+      input.form-control(type='password', name='new_password',  placeholder='New password', required='required')
+    .form-group
+      label(for='confirm') Confirm Password
+      input.form-control(type='password', name='new_password2',  placeholder='Confirm password',required='required')
+    .form-group
+      button.btn.btn-primary(type='submit') Update Password

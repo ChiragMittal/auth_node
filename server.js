@@ -12,6 +12,10 @@ var path = require('path');
 var morgan     = require("morgan");
 var User = require('./models/user');
 var bcrypt = require('bcrypt');
+var xoauth2 = require('xoauth2');
+var nodemailer = require('nodemailer');
+var async = require('async');
+var crypto = require('crypto');
 var app = express();
 
 
@@ -226,6 +230,132 @@ app.post('/reset_pwd',(req,res)=>{
             }
         })
 
+});
+
+app.get('/forgot',(req,res) =>{
+    res.render('forgot', {
+        user: req.user
+      });
+});
+
+app.post('/forgot', function(req, res, next) {
+    async.waterfall([
+      function(done) {
+        crypto.randomBytes(20, function(err, buf) {
+          var token = buf.toString('hex');
+          done(err, token);
+        });
+      },
+      function(token, done) {
+        User.findOne({ email: req.body.email }, function(err, user) {
+          if (!user) {
+            req.flash('error', 'No account with that email address exists.');
+            return res.redirect('/forgot');
+          }
+  
+          user.resetPasswordToken = token;
+          user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+  
+          user.save(function(err) {
+            done(err, token, user);
+          });
+        });
+      },
+      function(token, user, done) {
+        var smtpTransport = nodemailer.createTransport({
+          service: 'Gmail',
+          auth: {
+                type: 'OAuth2',
+                user: 'chiragmittal.cm@gmail.com',
+                clientId: '1077705428821-8esh9s4u00jetcv2luasj3u22s71dm4s.apps.googleusercontent.com' ,
+                clientSecret: 'z9p-2B3xubt4wTT9y3hBSZO1' ,
+                refreshToken: '1/klVSe9aNgqPjV3k-A-ivANRW4mbDTC3T9SITLJewobhT67daxlNPb4dwsJyAmgWE',
+                
+            
+           }
+        });
+        var mailOptions = {
+          to: user.email,
+          from: 'reset@node.com',
+          subject: 'Node.js Password Reset',
+          text: 'You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n' +
+            'Please click on the following link, or paste this into your browser to complete the process:\n\n' +
+            'http://' + req.headers.host + '/reset/' + token + '\n\n' +
+            'If you did not request this, please ignore this email and your password will remain unchanged.\n'
+        };
+        smtpTransport.sendMail(mailOptions, function(err,res) {
+            console.log(user.email)
+            console.log(mailOptions)
+        //   req.flash('info', 'An e-mail has been sent to ' + user.email + ' with further instructions.');
+        //   done(err, 'done');
+        if(err){
+            console.log(err);
+        }else{
+            console.log("Message sent: ");
+        }
+        
+
+        });
+      }
+    ], function(err) {
+      if (err) return next(err);
+      res.redirect('/forgot');
+    });
+  });
+
+  app.get('/reset/:token', function(req, res) {
+    User.findOne({ resetPasswordToken: req.params.token, resetPasswordExpires: { $gt: Date.now() } }, function(err, user) {
+      if (!user) {
+        req.flash('error', 'Password reset token is invalid or has expired.');
+        return res.redirect('/forgot');
+      }
+      res.render('reset_pwd', {
+        user: req.user
+      });
+    });
+  });
+
+  app.post('/reset/:token', function(req, res) {
+    User.findOne({ resetPasswordToken: req.params.token, resetPasswordExpires: { $gt: Date.now() } }, function(err, user) {
+      if (!user) {
+        req.flash('error', 'Password reset token is invalid or has expired.');
+        return res.redirect('/forgot');
+      }
+
+      User.findOne({
+        id : req.body.id,
+    },function(err,existingUser){
+
+        if(!existingUser) {
+            return res.status(409).send({message : 'Id does not exist'});
+
+        }
+        else{
+            if(req.body.new_password==req.body.new_password2){
+                bcrypt.genSalt(10, function(err, salt) {
+                    bcrypt.hash(req.body.new_password, salt, function(err, hash) {
+                        req.body.new_password = hash;
+                        console.log(req.body.new_password)
+
+                    User.update({id:req.body.id},{ $set: { password : req.body.new_password ,resetPasswordExpires : undefined ,resetPasswordToken : undefined}  }, (err, items) => {
+                        if (err) res.status(500).send(err)
+                
+                   
+                            console.log(items);
+                            res.redirect('/login')
+                            
+                    
+                        })
+                    });
+                    
+                });
+                
+            }
+        }
+        
+      
+    });
+  })
 });
 
 
