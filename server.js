@@ -16,6 +16,10 @@ var xoauth2 = require('xoauth2');
 var nodemailer = require('nodemailer');
 var async = require('async');
 var crypto = require('crypto');
+var router = require('express-promise-router')();
+var passport = require('passport');
+var GooglePlusTokenStrategy = require('passport-google-plus-token');
+var UserController = require('./controllers/users');
 var app = express();
 
 
@@ -85,6 +89,44 @@ app.get('/reset_pwd',function(req,res){
 app.get('/login',function(req,res){
     res.render('login',{});
 });
+
+app.get('/home/:id',(req,res)=>{
+    User.findOne({id:req.params.id},(err,user)=>{
+        if(user){
+            res.render('home',user);
+        }
+    })
+})
+
+passport.use('googleToken',new GooglePlusTokenStrategy({
+    clientID: '312728137910-tu78iun3igddjqglqfcadgru15l3td4p.apps.googleusercontent.com',
+  clientSecret: 'HixGH1ErVvWrOxUIReazhC8v'
+},async(accessToken,refreshToken, profile, done)=>{
+    console.log('profile', profile);
+    console.log('accessToken', accessToken);
+    console.log('refreshToken', refreshToken);
+
+    User.findOne({ "google.id": profile.id },function(err,existingUser){
+
+        if(existingUser){
+            return done(null, existingUser);
+        }
+            
+        var newUser = new User({
+            method: 'google',
+            google: {
+              id: profile.id,
+              email: profile.emails[0].value
+            }
+          });
+
+          User.createUser(newUser, function (err, user) {
+            if (err) throw err;
+            console.log(user);
+        });
+
+    });
+}));
  
 
 app.post('/register',  (req, res) => {
@@ -111,18 +153,31 @@ app.post('/register',  (req, res) => {
     
             }
             else{
-                var newUser = new User({
-                    name: name,
-                    email: email,
-                    id: id,
-                    password: password
+                User.findOne({'google.email': req.body.email} , (err,exists)=>{
+                    if(exists){
+                        return res.status(409).send({message : 'Email already exists'});
+                    }
+
+                    else{
+                        var newUser = new User({
+                            method : 'local',
+                            
+                                name: name,
+                            email: email,
+                            id: id,
+                            password: password
+                            
+                            
+                        });
+                        User.createUser(newUser, function (err, user) {
+                            if (err) throw err;
+                            console.log(user);
+                        });
+                 req.flash('success_msg', 'You are registered and can now login');
+                        res.redirect('/login');
+                    }
                 });
-                User.createUser(newUser, function (err, user) {
-                    if (err) throw err;
-                    console.log(user);
-                });
-         req.flash('success_msg', 'You are registered and can now login');
-                res.redirect('/login');
+                
                 }
         });
     }
@@ -141,6 +196,7 @@ app.post('/login',(req,res) =>{
         
         if(doc>0){
             User.find({id:req.body.id}).exec(function(err,result){
+        
                    
                     bcrypt.compare(req.body.password,result[0].password,function(err, callback){
                       
@@ -148,7 +204,11 @@ app.post('/login',(req,res) =>{
                    
                         if(callback){
                             req.session.cookie.maxAge = 1 * 24 * 60 * 60 * 1000;
-                            res.render('home',result[0]);
+
+                                res.redirect('/home/'+req.body.id);
+                                
+                           
+                            
                             //res.redirect('/home');
                         }
                         else{
@@ -357,6 +417,10 @@ app.post('/forgot', function(req, res, next) {
     });
   })
 });
+
+
+app.route('/google_auth')
+    .post(passport.authenticate('googleToken',{ session : false }), UserController.googleOAuth);
 
 
 
