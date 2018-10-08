@@ -90,10 +90,17 @@ app.get('/login',function(req,res){
     res.render('login',{});
 });
 
+app.get('/home',(req,res)=>{
+    // console.log(req.session.user);                      
+     res.render('home');
+});
+
+
+
 app.get('/home/:id',(req,res)=>{
     User.findOne({id:req.params.id},(err,user)=>{
         if(user){
-            res.render('home',user);
+            console.log('user found')
         }
     })
 })
@@ -200,15 +207,12 @@ app.post('/login',(req,res) =>{
                    
                     bcrypt.compare(req.body.password,result[0].password,function(err, callback){
                       
-                   console.log(result[0])
+                   
                    
                         if(callback){
                             req.session.cookie.maxAge = 1 * 24 * 60 * 60 * 1000;
+                            res.render('home',result[0]);
 
-                                res.redirect('/home/'+req.body.id);
-                                
-                           
-                            
                             //res.redirect('/home');
                         }
                         else{
@@ -233,7 +237,8 @@ app.post('/login',(req,res) =>{
 
 app.get('/logout', function (req, res) {
         req.logout();
-        req.session.cookie.expires = false;
+        req.session.cookie.maxAge = 0;
+        console.log(req.session.cookie.maxAge)
         req.flash('success_msg', 'You are logged out');
     
         res.redirect('/login');
