@@ -19,6 +19,7 @@ var crypto = require('crypto');
 var router = require('express-promise-router')();
 var passport = require('passport');
 var GooglePlusTokenStrategy = require('passport-google-plus-token');
+var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 var UserController = require('./controllers/users');
 var app = express();
 
@@ -92,7 +93,11 @@ app.get('/login',function(req,res){
 
 app.get('/home',(req,res)=>{
     // console.log(req.session.user);                      
-     res.render('home');
+     res.render('home', {
+        user: req.user
+      });
+
+    
 });
 
 
@@ -107,7 +112,8 @@ app.get('/home/:id',(req,res)=>{
 
 passport.use('googleToken',new GooglePlusTokenStrategy({
     clientID: '312728137910-tu78iun3igddjqglqfcadgru15l3td4p.apps.googleusercontent.com',
-  clientSecret: 'HixGH1ErVvWrOxUIReazhC8v'
+  clientSecret: 'x7GIyxjgQYRG2ocSE04Eh9v2',
+  callbackURL: 'http://localhost:3000/auth/google/callback'
 },async(accessToken,refreshToken, profile, done)=>{
     console.log('profile', profile);
     console.log('accessToken', accessToken);
@@ -116,21 +122,26 @@ passport.use('googleToken',new GooglePlusTokenStrategy({
     User.findOne({ "google.id": profile.id },function(err,existingUser){
 
         if(existingUser){
-            return done(null, existingUser);
+            console.log("user found")
         }
-            
-        var newUser = new User({
-            method: 'google',
-            google: {
-              id: profile.id,
-              email: profile.emails[0].value
-            }
-          });
-
-          User.createUser(newUser, function (err, user) {
-            if (err) throw err;
-            console.log(user);
-        });
+           else{
+            var newUser = new User({
+                method: 'google',
+                google: {
+                  id: profile.id,
+                  email: profile.emails[0].value,
+                  token : accessToken,
+                  name : profile.displayName
+    
+                }
+              });
+    
+              User.createUser(newUser, function (err, user) {
+                if (err) throw err;
+                console.log(user);
+            });
+           } 
+        
 
     });
 }));
@@ -238,7 +249,6 @@ app.post('/login',(req,res) =>{
 app.get('/logout', function (req, res) {
         req.logout();
         req.session.cookie.maxAge = 0;
-        console.log(req.session.cookie.maxAge)
         req.flash('success_msg', 'You are logged out');
     
         res.redirect('/login');
@@ -318,6 +328,7 @@ app.post('/forgot', function(req, res, next) {
             return res.redirect('/forgot');
           }
   
+          user.method = 'local';
           user.resetPasswordToken = token;
           user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
   
@@ -424,9 +435,25 @@ app.post('/forgot', function(req, res, next) {
 });
 
 
-app.route('/google_auth')
+app.route('/auth/google')
     .post(passport.authenticate('googleToken',{ session : false }), UserController.googleOAuth);
 
+app.route('/auth/google')
+    .get(passport.authenticate('googleToken', {scope: ['profile', 'email']}));
+
+app.route('/auth/google/callback') 
+    .get(passport.authenticate('googleToken', { successRedirect: '/home',
+    failureRedirect: '/' }));
+
+passport.serializeUser(function(user, done){
+		done(null, user.id);
+	});
+
+	passport.deserializeUser(function(id, done){
+		User.findById(id, function(err, user){
+			done(err, user);
+		});
+	});
 
 
 app.set('port', (process.env.PORT || 3000));

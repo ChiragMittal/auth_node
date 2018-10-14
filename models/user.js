@@ -38,6 +38,12 @@ var UserSchema = mongoose.Schema({
 		},
 		email: {
 			type: String
+		},
+		token : {
+			type:String
+		},
+		name : {
+			type :String
 		}
 	}
 	
