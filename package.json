@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/ChiragMittal/auth_passport#readme",
   "dependencies": {
-    "async": "^2.6.1",
+    "async": "^3.2.2",
     "bcrypt": "^3.0.0",
     "body-parser": "^1.18.3",
     "connect-flash": "^0.1.1",
